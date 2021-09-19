@@ -26,7 +26,6 @@ The python app uses environment variables for its config, which can be placed in
 The following environment variables are used:
 
 LOG_DIR                    directory to write the log file to 
-
 WRITE_LOG_TO_DISK          write log to disk if true, or to screen if false
 
 LOGGING_LEVEL              DEBUG, INFO, WARN, ERROR, EXCEPTION etc
