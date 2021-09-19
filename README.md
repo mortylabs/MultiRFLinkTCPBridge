@@ -27,21 +27,13 @@ The following environment variables are used:
 
 LOG_DIR                    directory to write the log file to 
 WRITE_LOG_TO_DISK          write log to disk if true, or to screen if false
-
 LOGGING_LEVEL              DEBUG, INFO, WARN, ERROR, EXCEPTION etc
-
 TELEGRAM_ENABLED           True/False
-
 TELEGRAM_BOT_KEY           Telegram key supplied by BotFather
-
 TELEGRAM_BOT_CHAT_ID       Telegram chat id
-
 RFLINK1_IP                 TCP IP address of first RfLink device
-
 RFLINK1_PORT               TCP PORT of first RfLink device
-
 RFLINK2_IP                 2nd RFLink device etc
-
 RFLINK2_PORT               etc
 
 RFLINK3_IP                 2nd RFLink device etc
