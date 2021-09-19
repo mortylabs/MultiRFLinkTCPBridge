@@ -35,13 +35,9 @@ RFLINK1_IP                 TCP IP address of first RfLink device
 RFLINK1_PORT               TCP PORT of first RfLink device
 RFLINK2_IP                 2nd RFLink device etc
 RFLINK2_PORT               etc
-
 RFLINK3_IP                 2nd RFLink device etc
-
 RFLINK3_PORT               etc
-
 RFLINK_BRIDGE_IP           etc
-
 RFLINK_BRIDGE_PORT         etc
 
 
