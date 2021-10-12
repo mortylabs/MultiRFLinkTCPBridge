@@ -159,7 +159,7 @@ class RFLinkThread (threading.Thread):
                         if q.qsize() > 50:
                             logging.warning(self.__class__.__name__ +": queue size exceeds 50, discarding new msg: " + str(response))
                         else:
-                            logging.debug(self.__class__.__name__ +": " + self.ip + str(self.port) + " received: " +str( response))
+                            logging.debug(self.__class__.__name__ +": " + self.ip + ":" + str(self.port) + " got: " +str( response))
                             q.put(response)
                 else:
                         logging.info (self.__class__.__name__ +": " + self.ip + " disconnected")
