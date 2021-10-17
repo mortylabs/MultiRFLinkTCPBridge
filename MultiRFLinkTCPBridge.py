@@ -162,7 +162,7 @@ class RFLinkThread (threading.Thread):
                             logging.debug(self.__class__.__name__ +": " + self.ip + ":" + str(self.port) + " got: " +str( response))
                             q.put(response)
                 else:
-                        logging.error (self.__class__.__name__ +": " + self.ip + " disconnected, sleeping for 10s...")
+                        log_error_and_send_telegram(self.__class__.__name__ +": " + self.ip + " disconnected, sleeping for 10s...")
                         sleep(10)
                         self.s.connect((self.ip, self.port))
        except:
