@@ -170,6 +170,7 @@ class RFLinkThread (threading.Thread):
                             try:
                                 self.s.connect((self.ip, self.port))
                                 reconnected = True
+                                logging.info(self.__class__.__name__ +": " + self.ip + " reconnected!")
                                 send_telegram(self.__class__.__name__ +": " + self.ip + " reconnected!")
                             except:
                                 log_error_and_send_telegram(self.__class__.__name__ +": " + self.ip + " reconnecting in 10s")
