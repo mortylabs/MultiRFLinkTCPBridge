@@ -25,7 +25,7 @@ from os import path, getcwd, getenv
 from sys import exc_info
 from dotenv import load_dotenv
 import telepot
-
+from time import sleep
 from docopt import docopt
 load_dotenv(path.join(path.abspath(path.dirname(__file__)), '.env'))
 APPLICATION_NAME = path.basename(__file__).replace(".py", "")
@@ -162,7 +162,9 @@ class RFLinkThread (threading.Thread):
                             logging.debug(self.__class__.__name__ +": " + self.ip + ":" + str(self.port) + " got: " +str( response))
                             q.put(response)
                 else:
-                        logging.info (self.__class__.__name__ +": " + self.ip + " disconnected")
+                        logging.error (self.__class__.__name__ +": " + self.ip + " disconnected, sleeping for 10s...")
+                        sleep(10)
+                        self.s.connect((self.ip, self.port))
        except:
           log_error_and_send_telegram(error_handling())
 
