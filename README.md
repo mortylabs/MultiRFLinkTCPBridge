@@ -23,7 +23,7 @@ By leveraging the alias feature of the HA RFLINK plugin, a single device in HA c
 
 The python app uses environment variables for its config, which can be placed inside a .env fiile in the same directory as the python script.
 
-The following environment variables are used:
+The following env variables are used:
 
 LOG_DIR                    directory to write the log file to 
 WRITE_LOG_TO_DISK          write log to disk if true, or to screen if false
