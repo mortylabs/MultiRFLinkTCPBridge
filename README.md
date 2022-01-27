@@ -10,7 +10,7 @@ However, if you need HA to subscribe to multiple RFLINK devices then this is whe
 
 Why would someone have multiple RFLINKs? One device may be operating on 433mhz and another on 866mhz etc. Or there may be two 433mhz devices to counteract thick concrete walls over a large area. 
 
-Why not use something like a RFLINK2MQTT bridge? If your devices only publish a single code then this is actually ideal. However, a lot of my cheap 433mhz motion sensors from China actually transmit multiple codes for the same device (EV1527 and SelectPlus). Sometimes only the EV1527 code is heard, or only the SelectPlus, or both.
+So why not use something like a RFLINK2MQTT bridge? If your devices only publish a single code then this is actually ideal. However, a lot of my cheap 433mhz motion sensors from China actually transmit multiple codes for the same device (EV1527 and SelectPlus). Sometimes only the EV1527 code is heard, or only the SelectPlus, or both.
 
 The HA RFLINK plugin has a handy feature where aliases can be listed where a RFLINK device transmits multiple codes for the same motion sensor, and the config looks like this:
 
