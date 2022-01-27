@@ -19,7 +19,7 @@ The HA RFLINK plugin has a handy feature where aliases can be listed where a RFL
 By leveraging the alias feature of the HA RFLINK plugin, a single device in HA can be associated with multiple transmission codes, which is incredibly handy.
 
 
-# Instructions
+# How To Use
 
 The python app uses environment variables for its config, which can be placed inside a .env fiile in the same directory as the python script.
 
