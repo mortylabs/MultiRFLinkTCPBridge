@@ -1,4 +1,4 @@
-# 🚀 MultiRFLink TCP Bridge
+# MultiRFLink TCP Bridge
 
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
