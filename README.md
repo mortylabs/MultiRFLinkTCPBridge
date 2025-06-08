@@ -1,7 +1,6 @@
 # MultiRFLink TCP Bridge
 
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
-
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **MultiRFLinkTCPBridge** is a robust Python app that consolidates multiple RFLink streams (433MHz, 868MHz, etc.) from distributed devices into a single TCP output - ready for Home Assistant or any automation hub.
