@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 '''
-reads in the following env vairables,
+"""
+MultiRFLink TCP Bridge
+
+This script enables Home Assistant and other systems to interface with multiple RFLink devices
+simultaneously by aggregating their data into a single TCP stream. This overcomes the
+single-RFLink limitation found in many home automation platforms like Home Assistant.
+
+You can deploy multiple RFLink receivers (e.g., Raspberry Pi Zero W devices with RF modules) throughout your home.
+Each RFLink can sniff different frequencies like 433MHz or 868MHz, dramatically improving your RF coverage.
+This bridge links all of them together and presents them as one unified stream for Home Assistant or other consumers.
+
+
+This app reads in the following env vairables,
     which can be set already externaally via an export --OR__
     supplied in a ".env" file in the same directory as this python script:
 LOG_DIR                     directory to write logs to
@@ -26,190 +38,137 @@ from sys import exc_info
 from dotenv import load_dotenv
 import telepot
 from time import sleep
-from docopt import docopt
+
+# Load environment variables
 load_dotenv(path.join(path.abspath(path.dirname(__file__)), '.env'))
-APPLICATION_NAME = path.basename(__file__).replace(".py", "")
 
-LOG_DIR = getenv('LOG_DIR', getcwd())
-if not path.isdir(LOG_DIR):
-    logging.warning("invalid value for $DIR_LOG (%s), overriding to cwd (%s)", LOG_DIR,
-                    getcwd())
-    LOG_DIR = getcwd()
-LOG_DIR = LOG_DIR + ("/" if LOG_DIR[-1] != "/" else "")
-LOG_FILE = path.basename(APPLICATION_NAME) + ".log"
-if LOG_DIR is not None and path.isdir(LOG_DIR):
-    LOG_FILE = LOG_DIR + LOG_FILE
-elif path.isdir(path.expanduser("~") + "/logs"):
-    LOG_FILE = path.expanduser("~") + "/logs" + LOG_FILE
-else:
-    LOG_FILE = __file__
+APP_NAME = path.basename(__file__).replace(".py", "")
 
+# Logging setup
+log_dir = getenv('LOG_DIR', getcwd())
+if not path.isdir(log_dir):
+    logging.warning("Invalid $LOG_DIR (%s), defaulting to cwd (%s)", log_dir, getcwd())
+    log_dir = getcwd()
+log_dir = path.join(log_dir, '')
 
-WRITE_LOG_TO_DISK=True if getenv('WRITE_LOG_TO_DISK') is not None and getenv('WRITE_LOG_TO_DISK', False).lower() == "true" else False
-LOGGING_LEVEL=logging.getLevelName(getenv('LOGGING_LEVEL', logging.INFO))
-LOGGING_LEVEL=logging.INFO if not isinstance(LOGGING_LEVEL,int) else LOGGING_LEVEL
-#getattr(logging, LOGGING_LEVEL.upper(),logging.INFO)
+log_file = path.join(log_dir, f"{APP_NAME}.log")
+
+write_log_to_disk = getenv('WRITE_LOG_TO_DISK', 'false').lower() == 'true'
+log_level = logging.getLevelName(getenv('LOGGING_LEVEL', 'INFO').upper())
+log_level = log_level if isinstance(log_level, int) else logging.INFO
+
+log_format = '%(asctime)s %(funcName)-20s [%(lineno)s]: %(message)s'
+log_datefmt = '%Y-%m-%d %H:%M:%S'
+
+logging.basicConfig(
+    format=log_format,
+    datefmt=log_datefmt,
+    filename=log_file if write_log_to_disk else None,
+    level=log_level
+)
+
 logger = logging.getLogger(__name__)
 
-TELEGRAM_ENABLED = getenv('TELEGRAM_ENABLED', False)
-TELEGRAM_BOT_KEY = getenv('TELEGRAM_BOT_KEY')
-TELEGRAM_BOT_CHAT_ID = getenv('TELEGRAM_BOT_CHAT_ID')
-bot = telepot.Bot(TELEGRAM_BOT_KEY) if TELEGRAM_ENABLED else None
+# Telegram setup
+telegram_enabled = getenv('TELEGRAM_ENABLED', 'false').lower() == 'true'
+telegram_bot_key = getenv('TELEGRAM_BOT_KEY')
+telegram_chat_id = getenv('TELEGRAM_BOT_CHAT_ID')
+telegram_bot = telepot.Bot(telegram_bot_key) if telegram_enabled else None
 
-RFLINK_BRIDGE_IP   = getenv('RFLINK_BRIDGE_IP', "localhost" )
-RFLINK_BRIDGE_PORT = getenv('RFLINK_BRIDGE_PORT', "1234")
+# RFLink device config
+bridge_ip = getenv('RFLINK_BRIDGE_IP', 'localhost')
+bridge_port = int(getenv('RFLINK_BRIDGE_PORT', '1234'))
 
-RFLINK1_IP   = getenv('RFLINK1_IP', None)
-RFLINK1_PORT = getenv('RFLINK1_PORT', None)
-RFLINK2_IP   = getenv('RFLINK2_IP', None)
-RFLINK2_PORT = getenv('RFLINK2_PORT', None)
-RFLINK3_IP   = getenv('RFLINK3_IP', None)
-RFLINK3_PORT = getenv('RFLINK3_PORT', None)
+devices = [
+    (getenv('RFLINK1_IP'), getenv('RFLINK1_PORT')),
+    (getenv('RFLINK2_IP'), getenv('RFLINK2_PORT')),
+    (getenv('RFLINK3_IP'), getenv('RFLINK3_PORT'))
+]
 
-fmt = '%(asctime)s %(funcName)-20s [%(lineno)s]: %(message)s'
-datefmt = '%Y-%m-%d %H:%M:%S'
-logger = logging.getLogger(__name__)
+message_queue = queue.Queue()
 
-if WRITE_LOG_TO_DISK:
-    logging.basicConfig(format=fmt, datefmt=datefmt, filename=LOG_FILE, filemode="a", level=logging.DEBUG)
-else:
-    logging.basicConfig(format=fmt, datefmt=datefmt, level=LOGGING_LEVEL)
+def format_exception():
+    return f"line: {exc_info()[2].tb_lineno}, {exc_info()[1]}" if exc_info()[0] else "exc_info not available!"
 
-q = queue.Queue()
-
-print (LOG_FILE)
-print ("DEBUG", LOGGING_LEVEL)
-
-
-def error_handling():
-    if exc_info()[0] is None:
-        return "exc_info not available!"
+def log_error_and_notify(message):
+    if exc_info()[0]:
+        logger.exception(message)
     else:
-        return ' line: {}, {}'.format(
-            #        exc_info()[0],
-            exc_info()[2].tb_lineno,
-            exc_info()[1]
-        )
+        logger.error(message)
 
+    if telegram_enabled:
+        telegram_bot.sendMessage(telegram_chat_id, f"<b>{APP_NAME}</b>\n<i>{message}</i>", parse_mode="Html")
 
-def log_error_and_send_telegram(msg):
-    if exc_info()[0] is None:
-        logging.error (msg)
-    else:
-        logging.exception(msg)
-    if TELEGRAM_ENABLED:
-        bot.sendMessage(TELEGRAM_BOT_CHAT_ID, "<b>" + APPLICATION_NAME + "</b>\n<i>" + msg + "</i>",
-                    parse_mode="Html")
+def send_telegram_message(message):
+    if telegram_enabled:
+        telegram_bot.sendMessage(telegram_chat_id, f"<b>{APP_NAME}</b>\n<i>{message}</i>", parse_mode="Html")
 
+class BridgeThread(threading.Thread):
+    def __init__(self, ip, port):
+        super().__init__()
+        self.ip = ip
+        self.port = port
 
-def send_telegram(msg):
-    if TELEGRAM_ENABLED:
-        bot.sendMessage(TELEGRAM_BOT_CHAT_ID, '<b>' + APPLICATION_NAME.replace(".py", "") + '</b>\n<i>' + msg + "</i>",
-                    parse_mode="Html")
-
-
-
-
-class BridgeThread (threading.Thread):
-        def __init__(self, ip, port):
-                threading.Thread.__init__(self)
-                self.ip = ip
-                self.port = int(port)
-
-        def run(self):
-          while True:
-            try:
-                logging.info(self.__class__.__name__ + ": starting on "+  self.ip + ":" + str(self.port))
-                self.s = socket.socket()
-                self.s.bind((self.ip, self.port))
-                self.s.listen(2) # change to 2+ if multiple instances of HA are listening to this bridge
-                logging.info (self.__class__.__name__ +": listening for client..")
-                conn, addr = self.s.accept()
-                with conn:
-                        logging.info (self.__class__.__name__ +': incoming connection from '+ str(addr))
-                        logging.info (self.__class__.__name__ +": qsize is " + str( q.qsize()))
-                        while not q.empty():
-                                logging.info (self.__class__.__name__ +": draining queue of old msgs (" + str(q.qsize()) +  "remaining) ...")
-                                q.get()
-                        while True:
-                                item = q.get()
-                                logging.info(self.__class__.__name__ +": processing " + str(item))
-                                conn.sendall(item)
-                                q.task_done()
-            except:
-                  log_error_and_send_telegram(error_handling())
-
-
-class RFLinkThread (threading.Thread):
-   def __init__(self, ip, port):
-      threading.Thread.__init__(self)
-      self.ip = ip
-      self.port = int(port)
-
-   def run(self):
-     while True:
-       try:
-        logging.debug (self.__class__.__name__ +": subscribing to " + self.ip + ":" + str(self.port))
-        self.s = socket.socket()
-        self.s.connect((self.ip, self.port))
+    def run(self):
         while True:
-                data = self.s.recv(1024)
-                if data:
-                        response = data
-                        if q.qsize() > 50:
-                            logging.warning(self.__class__.__name__ +": queue size exceeds 50, discarding new msg: " + str(response))
+            try:
+                logger.info(f"{self.__class__.__name__}: Starting on {self.ip}:{self.port}")
+                with socket.socket() as server_socket:
+                    server_socket.bind((self.ip, self.port))
+                    server_socket.listen(2)
+                    logger.info(f"{self.__class__.__name__}: Listening for client...")
+                    conn, addr = server_socket.accept()
+                    with conn:
+                        logger.info(f"{self.__class__.__name__}: Incoming connection from {addr}")
+                        while not message_queue.empty():
+                            logger.info(f"{self.__class__.__name__}: Draining old messages ({message_queue.qsize()} remaining)...")
+                            message_queue.get()
+                        while True:
+                            item = message_queue.get()
+                            logger.info(f"{self.__class__.__name__}: Sending {item}")
+                            conn.sendall(item)
+                            message_queue.task_done()
+            except Exception:
+                log_error_and_notify(format_exception())
+
+class RFLinkThread(threading.Thread):
+    def __init__(self, ip, port):
+        super().__init__()
+        self.ip = ip
+        self.port = int(port)
+
+    def run(self):
+        while True:
+            try:
+                logger.debug(f"{self.__class__.__name__}: Connecting to {self.ip}:{self.port}")
+                with socket.socket() as client_socket:
+                    client_socket.connect((self.ip, self.port))
+                    while True:
+                        data = client_socket.recv(1024)
+                        if data:
+                            if message_queue.qsize() > 50:
+                                logger.warning(f"{self.__class__.__name__}: Queue full, discarding message: {data}")
+                            else:
+                                logger.debug(f"{self.__class__.__name__}: Received: {data}")
+                                message_queue.put(data)
                         else:
-                            logging.debug(self.__class__.__name__ +": " + self.ip + ":" + str(self.port) + " got: " +str( response))
-                            q.put(response)
-                else:
-                        log_error_and_send_telegram(self.__class__.__name__ +": " + self.ip + " disconnected...")
-                        sleep(10)
-                        self.s = socket.socket()
-                        reconnected = False
-                        while not reconnected:
-                            try:
-                                self.s.connect((self.ip, self.port))
-                                reconnected = True
-                                logging.info(self.__class__.__name__ +": " + self.ip + " reconnected!")
-                                send_telegram(self.__class__.__name__ +": " + self.ip + " reconnected!")
-                            except:
-                                log_error_and_send_telegram(self.__class__.__name__ +": " + self.ip + " reconnecting in 10s")
-                                sleep(10)
-       except:
-          log_error_and_send_telegram(error_handling())
-
-
+                            log_error_and_notify(f"{self.__class__.__name__}: {self.ip} disconnected...")
+                            sleep(10)
+                            break
+            except Exception:
+                log_error_and_notify(format_exception())
+                sleep(10)
 
 if __name__ == "__main__":
-    logging.info("starting...")
+    logger.info("Starting application...")
 
-    rflink_thread1 = None
-    rflink_thread2 = None
-    rflink_thread3 = None
+    for idx, (ip, port) in enumerate(devices, start=1):
+        if ip and port:
+            thread = RFLinkThread(ip, port)
+            thread.start()
+        else:
+            logger.info(f"RFLINK{idx} disabled")
 
-    if RFLINK1_IP is not None and RFLINK1_PORT is not None:
-        rflink_thread1 = RFLinkThread(RFLINK1_IP, RFLINK1_PORT)
-        rflink_thread1.start()
-    else:
-        logging.info("RFLINK1 disabled")
-
-    if RFLINK2_IP is not None and RFLINK2_PORT is not None:
-        rflink_thread2 = RFLinkThread(RFLINK2_IP, RFLINK2_PORT)
-        rflink_thread2.start()
-    else:
-        logging.info("RFLINK2 disabled")
-
-    if RFLINK3_IP is not None and RFLINK3_PORT is not None:
-        rflink_thread3 = RFLinkThread(RFLINK3_IP, RFLINK3_PORT)
-        rflink_thread3.start()
-    else:
-        logging.info("RFLINK3 disabled")
-
-    bridge_thread = BridgeThread(RFLINK_BRIDGE_IP, RFLINK_BRIDGE_PORT)
+    bridge_thread = BridgeThread(bridge_ip, bridge_port)
     bridge_thread.start()
     bridge_thread.join()
-#    if rflink_thread1 is not None:   rflink_thread1.join()
-#    if rflink_thread2 is not None:   rflink_thread2.join()
-#    if rflink_thread3 is not None:   rflink_thread3.join()
-
-
